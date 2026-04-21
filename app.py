@@ -43,6 +43,22 @@ def format_book():
     book_title = request.form['book_title']
     font_name = request.form.get('font_name', 'Garamond')
     font_size = float(request.form.get('font_size', 12))
+    theme = request.form.get('theme', 'classic')
+
+    themes = {
+        'classic': {'font': 'Garamond', 'size': 11.5, 'heading_size': 14},
+        'modern': {'font': 'Georgia', 'size': 12, 'heading_size': 16},
+        'romance': {'font': 'Palatino Linotype', 'size': 11, 'heading_size': 13},
+        'nonfiction': {'font': 'Times New Roman', 'size': 12, 'heading_size': 15},
+        'minimalist': {'font': 'Book Antiqua', 'size': 11, 'heading_size': 12},
+    }
+
+    if theme in themes:
+        font_name = themes[theme]['font']
+        font_size = themes[theme]['size']
+        heading_size = themes[theme]['heading_size']
+    else:
+        heading_size = 14
 
     doc = Document(file)
     section = doc.sections[0]
@@ -54,11 +70,16 @@ def format_book():
     section.left_margin = Inches(margin_inside)
     section.right_margin = Inches(margin_outside)
 
+    # Replace scene breaks *** or --- with typographic ornament
     for para in doc.paragraphs:
-        is_heading = para.style.name.startswith('Heading')
-        is_title = para.style.name in ['Title', 'Subtitle']
-        is_empty = len(para.text.strip()) == 0
-
+        if para.text.strip() in ['***', '---', '* * *']:
+            para.clear()
+            run = para.add_run('✦')
+            run.font.name = font_name
+            run.font.size = Pt(font_size)
+            para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            para.paragraph_format.space_before = Pt(12)
+            para.paragraph_format.space_after = Pt(12)
         if is_empty:
             para.paragraph_format.space_before = Pt(0)
             para.paragraph_format.space_after = Pt(0)
@@ -67,6 +88,10 @@ def format_book():
         if is_heading or is_title:
             para.paragraph_format.space_before = Pt(24)
             para.paragraph_format.space_after = Pt(6)
+            para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            for run in para.runs:
+                run.font.name = font_name
+                run.font.size = Pt(heading_size)
             continue
 
         para.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
