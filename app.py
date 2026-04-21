@@ -102,13 +102,16 @@ def format_book():
 
 @app.route('/cover', methods=['POST'])
 def generate_cover():
-    cover_image = request.files['cover_image']
+    front_image = request.files['front_image']
+    back_image = request.files.get('back_image')
+    spine_image = request.files.get('spine_image')
     trim_width = float(request.form['trim_width'])
     trim_height = float(request.form['trim_height'])
     page_count = int(request.form['page_count'])
     paper_type = request.form.get('paper_type', 'white')
     title = request.form.get('title', '')
     author = request.form.get('author', '')
+    spine_color = request.form.get('spine_color', '#282828')
 
     if paper_type == 'cream':
         spine_width = page_count * 0.0025
@@ -125,19 +128,38 @@ def generate_cover():
     total_width_px = int(total_width * dpi)
     total_height_px = int(total_height * dpi)
     trim_width_px = int(trim_width * dpi)
-    spine_width_px = int(spine_width * dpi)
+    spine_width_px = max(int(spine_width * dpi), 1)
     bleed_px = int(bleed * dpi)
 
     cover = Image.new('RGB', (total_width_px, total_height_px), (255, 255, 255))
 
-    front_img = Image.open(cover_image)
+    # BACK COVER
+    if back_image:
+        back_img = Image.open(back_image)
+        back_img = back_img.resize((trim_width_px, total_height_px), Image.LANCZOS)
+        cover.paste(back_img, (bleed_px, 0))
+    else:
+        back_fill = Image.new('RGB', (trim_width_px, total_height_px), (240, 240, 240))
+        cover.paste(back_fill, (bleed_px, 0))
+
+    # SPINE
+    spine_x = bleed_px + trim_width_px
+    if spine_image:
+        sp_img = Image.open(spine_image)
+        sp_img = sp_img.resize((spine_width_px, total_height_px), Image.LANCZOS)
+        cover.paste(sp_img, (spine_x, 0))
+    else:
+        r = int(spine_color[1:3], 16)
+        g = int(spine_color[3:5], 16)
+        b = int(spine_color[5:7], 16)
+        spine_fill = Image.new('RGB', (spine_width_px, total_height_px), (r, g, b))
+        cover.paste(spine_fill, (spine_x, 0))
+
+    # FRONT COVER
+    front_img = Image.open(front_image)
     front_img = front_img.resize((trim_width_px, total_height_px), Image.LANCZOS)
-
-    front_x = bleed_px + spine_width_px + trim_width_px
+    front_x = bleed_px + trim_width_px + spine_width_px
     cover.paste(front_img, (front_x, 0))
-
-    spine_img = Image.new('RGB', (spine_width_px, total_height_px), (40, 40, 40))
-    cover.paste(spine_img, (bleed_px + trim_width_px, 0))
 
     tmp = tempfile.NamedTemporaryFile(delete=False, suffix='.jpg', dir=os.getcwd())
     cover.save(tmp.name, 'JPEG', quality=95, dpi=(300, 300))
