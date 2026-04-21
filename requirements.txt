@@ -3,3 +3,5 @@ flask-cors
 python-docx
 gunicorn
 requests
+Pillow
+reportlab
